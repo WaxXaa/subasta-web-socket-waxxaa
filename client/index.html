@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subasta</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
+</head>
+
+<body>
+  <div id="modal" class="modal"> <!--ventana modal-->
+    <div class="modal-content">
+      <h2>Introduce tu nombre de usuario</h2>
+      <input type="text" id="nombreUsuario" placeholder="Nombre de usuario" required>
+      <button id="siguiente">Siguiente</button>
+    </div>
+  </div>
+
+  <header>Subasta</header>
+
+  <h1>Precio</h1>
+  <h3 id="usuario"></h3>
+  <div class="cont" id="precio">$ 0.00</div>
+  <div class="cont">
+    <p>Aumentar puja en $50</p>
+    <div class="cont" id="incremento">
+      <button type="button" id="aumentarPrecio">Aumentar puja</button>
+      <button type="button" id="disminuirPrecio">Disminuir puja</button>
+    </div>
+    <p>Introduce un monto de puja</p>
+    <input type="number" id="montoApostar" min="50" value="50.00" />
+
+    <button type="button" id="pujar">Pujar</button>
+    <p>Nota:
+    <ul>
+      <li>
+        <i>Que la puja sea mayor al precio actual</i>
+      </li>
+      <li>
+        <i>el monto minimo para pujar es de $50</i>
+      </li>
+    </ul>
+    </p>
+  </div>
+  <div id="notificaciones"></div>
+  <script>
+
+    const modal = document.getElementById('modal');
+    let user = localStorage.getItem('user') || ''
+    let otherUser = [] //remplazar por localstorage
+    function mostrarModal() {
+
+      if (!user)
+        console.log('mostrando')
+      modal.style.display = 'block';
+    }
+
+    function cerrarModal() {
+      console.log('cerrando')
+      modal.style.display = 'none';
+    }
+    function personalizar() {
+      document.querySelector('#usuario').textContent = 'Bienvenido ' + user
+    }
+    document.querySelector('#siguiente').addEventListener('click', (e) => {
+      const nombreUsuario = document.getElementById('nombreUsuario').value;
+      if (nombreUsuario.trim() !== '') {
+        localStorage.setItem('user', nombreUsuario)
+        user = nombreUsuario
+        personalizar()
+        console.log('usuario: ', user)
+        cerrarModal();
+      } else {
+        alert('Por favor, introduce un nombre de usuario válido.');
+      }
+    })
+
+
+    const cliente = io('http://localhost:8000', { transports: ['websocket'] })
+    cliente.on('actualizar', (precio) => {
+      document.querySelector('#precio').textContent = `$ ${precio}`;
+    })
+    function notificacionPuja(user) {
+      console.log(user)
+      console.log(otherUser)
+      if (user && user !== '') {
+        const notificationContainer = document.getElementById('notificaciones');
+        const notification = document.createElement('div');
+        notification.className = 'notificacion';
+        notification.textContent = user + ' acaba de pujar';
+        notificationContainer.appendChild(notification);
+
+        setTimeout(() => {
+          notification.style.opacity = 0;
+          setTimeout(() => {
+            otherUser.shift()
+            notification.remove();
+          }, 4000);
+        }, 4000);
+      }
+    }
+    notificacionPuja(otherUser[-1])
+    cliente.on('nuevo-precio', (data) => {
+      console.log(data)
+      document.querySelector('#precio').textContent = `$ ${data.monto}`;
+      otherUser.push(data.user)
+    });
+
+    function aumentarPrecio(e) {
+      e.preventDefault()
+      let montoApostar = parseFloat(document.querySelector('#montoApostar').value);
+      console.log(montoApostar)
+      montoApostar += 50.00;
+      console.log(montoApostar, 'despues de acumular')
+      document.querySelector('#montoApostar').value = montoApostar;
+    }
+
+    function disminuirPrecio(e) {
+      e.preventDefault()
+      let montoApostar = parseFloat(document.querySelector('#montoApostar').value);
+      console.log(montoApostar)
+      if (montoApostar - 50 > 50) {
+        montoApostar -= 50.00;
+        document.querySelector('#montoApostar').value = montoApostar;
+      }
+    }
+
+    function pujar(e) {
+      e.preventDefault()
+      const monto = parseFloat(document.querySelector('#montoApostar').value);
+      console.log(monto)
+      if (!isNaN(monto)) {
+        cliente.emit('puja', { user, monto });
+      }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log(user);
+
+      if (!user) {
+        mostrarModal();
+      } else {
+        personalizar();
+      }
+
+      // Agrega el event listener para el primer clic en el botón
+      document.querySelector('#pujar').addEventListener('click', pujar);
+      document.querySelector('#aumentarPrecio').addEventListener('click', aumentarPrecio);
+      document.querySelector('#disminuirPrecio').addEventListener('click', disminuirPrecio);
+    });
+
+    window.addEventListener('beforeunload', () => {
+      console.log("cerrado")
+      cliente.end();
+      cliente.destroy();
+    });
+
+  </script>
+</body>
+
+</html>
