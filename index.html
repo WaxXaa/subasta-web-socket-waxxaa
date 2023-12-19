@@ -78,7 +78,7 @@
     })
 
 
-    const cliente = io('http://localhost:8000', { transports: ['websocket'] })
+    const cliente = io('https://subasta-websocket-server.vercel.app/', { transports: ['websocket'] })
     cliente.on('actualizar', (precio) => {
       document.querySelector('#precio').textContent = `$ ${precio}`;
     })
